@@ -1372,14 +1372,55 @@ const getAllTransaction = async (req, res, next) => {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
+        const destinationAirport = req.query.destination;
+        const departureAirport = req.query.departure;
 
-        const transactions = await prisma.ticketTransaction.findMany({
-            skip: offset,
-            take: limit,
-            include: {
-                Transaction_Detail: true,
-            },
-        });
+        const conditions = {};
+        if (destinationAirport) {
+            conditions.destinationAirport = {
+                code: {
+                    contains: destinationAirport,
+                    mode: "insensitive",
+                },
+            };
+        }
+        if (departureAirport) {
+            conditions.departureAirport = {
+                code: {
+                    contains: departureAirport,
+                    mode: "insensitive",
+                },
+            };
+        }
+
+        let transactions;
+        if (conditions.length > 0) {
+            transactions = await prisma.ticketTransaction.findMany({
+                skip: offset,
+                take: limit,
+                include: {
+                    Transaction_Detail: {
+                        include: {
+                            flight: {
+                                where: conditions,
+                            },
+                        },
+                    },
+                },
+            });
+        } else {
+            transactions = await prisma.ticketTransaction.findMany({
+                skip: offset,
+                take: limit,
+                include: {
+                    Transaction_Detail: {
+                        include: {
+                            flight: true,
+                        },
+                    },
+                },
+            });
+        }
 
         const count = await prisma.ticketTransaction.count();
 
@@ -1404,6 +1445,7 @@ const getAllTransaction = async (req, res, next) => {
         );
     }
 };
+
 
 const getAdminTransactionById = async (req, res, next) => {
     // get transaction data by id from ticketTransaction & include ticketTransaction detail
